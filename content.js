@@ -19,8 +19,14 @@ const LANGUAGES = {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "initiateTranslation") {
     const coords = getSelectionCoords();
-    chrome.storage.sync.get({ targetLang: 'en' }, (data) => {
-      showOverlay(request.text, 'auto', data.targetLang, coords);
+    // Fetch SL, TL, and Theme preference
+    chrome.storage.sync.get({ 
+      sourceLang: 'auto', 
+      targetLang: 'en', 
+      theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' 
+    }, (data) => {
+      isDark = data.theme === 'dark'; // Sync local variable
+      showOverlay(request.text, data.sourceLang, data.targetLang, coords);
     });
   }
 });
@@ -55,6 +61,8 @@ function showOverlay(text, sl, tl, coords) {
   const style = document.createElement('style');
   const updateStyles = () => {
     style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
       :host {
         --bg: ${isDark ? '#2d2e31' : '#ffffff'};
         --text: ${isDark ? '#e8eaed' : '#202124'};
@@ -71,7 +79,9 @@ function showOverlay(text, sl, tl, coords) {
         ${spawnAtTop ? 'transform: translateY(-100%);' : ''}
         z-index: 2147483647; width: 400px; background: var(--bg);
         border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-        font-family: 'Segoe UI', Tahoma, sans-serif; border: 1px solid var(--border);
+        font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+        border: 1px solid var(--border); 
+        color: var(--text);
         color: var(--text); animation: fadeIn 0.1s ease-out;
         overflow: hidden;
       }
@@ -185,8 +195,28 @@ function showOverlay(text, sl, tl, coords) {
     container.querySelector('#theme-btn').innerText = isDark ? '☀️' : '🌙';
   };
 
-  slEl.onchange = fetchUpdate;
-  tlEl.onchange = fetchUpdate;
+  // Handle Source Language Change
+  slEl.onchange = () => {
+    chrome.storage.sync.set({ sourceLang: slEl.value });
+    fetchUpdate();
+  };
+
+  // Handle Target Language Change
+  tlEl.onchange = () => {
+    chrome.storage.sync.set({ targetLang: tlEl.value });
+    fetchUpdate();
+  };
+
+  // Handle Theme Toggle
+  container.querySelector('#theme-btn').onclick = (e) => {
+    e.stopPropagation();
+    isDark = !isDark;
+    chrome.storage.sync.set({ theme: isDark ? 'dark' : 'light' });
+    updateStyles();
+    renderContent();
+    // Re-bind values after re-render...
+  };
+
   container.querySelector('#cpy').onclick = () => navigator.clipboard.writeText(resEl.innerText);
   container.querySelector('#spk').onclick = () => {
     window.speechSynthesis.cancel();
