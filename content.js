@@ -152,11 +152,11 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
       .header-controls { display: flex; align-items: center; gap: 4px; }
       .logo-icon { width: 18px; height: 18px; fill: var(--accent); margin-right: 4px; }
       
-      select { border: none; background: none; font-size: 13px; color: var(--accent); cursor: pointer; font-weight: 700; font-family: inherit; outline: none; }
+      select { border: none; background: none; font-size: 14px; color: var(--accent); cursor: pointer; font-weight: 700; font-family: inherit; outline: none; }
       .rev-btn { background: none; border: none; cursor: pointer; color: var(--text); opacity: 0.3; font-size: 14px; transition: 0.2s; }
       .rev-btn:hover { opacity: 1; color: var(--accent); transform: rotate(180deg); }
 
-      .gt-body { padding: 16px; font-size: 15px; line-height: 1.6; max-height: 280px; overflow-y: auto; min-height: 60px; }
+      .gt-body { padding: 16px; font-size: 18px; line-height: 1.6; max-height: 280px; overflow-y: auto; min-height: 60px; }
 
       .gt-footer { display: flex; align-items: center; justify-content: flex-end; padding: 6px 12px; background: var(--footer); border-top: 1px solid var(--border); gap: 6px; }
 
