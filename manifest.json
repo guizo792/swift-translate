@@ -5,12 +5,10 @@
   "description": "Instant translations, right where you read: Translates selected text via context menu and displays in a floating overlay.",
   "permissions": [
     "contextMenus",
-    "storage",
-    "activeTab",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://translate.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background.js"
