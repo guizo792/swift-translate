@@ -6,6 +6,7 @@
 
 Built for personal use to fix the frustration of breaking flow while reading articles, and open-sourced for anyone to use or improve!
 
+![Swift Translate Demo](./assets/swift-translate.gif)
 
 ### Installation
 
