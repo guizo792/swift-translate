@@ -77,6 +77,7 @@ const LANGUAGES = {
 };
 
 function startTranslation(text) {
+  removeSelectionIcon();
   const coords = getSelectionCoords();
   chrome.storage.sync.get(
     {
@@ -117,7 +118,7 @@ function showSelectionIcon(text, rect) {
     <style>
       button {
         position: absolute; z-index: 2147483647; width: 30px; height: 30px;
-        top: ${rect.bottom + window.scrollY + 6}px;
+        top: ${Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 38)) + window.scrollY}px;
         left: ${Math.max(8, Math.min(rect.right + window.scrollX, window.scrollX + window.innerWidth - 38))}px;
         border-radius: 50%; border: 1px solid #dadce0; background: #fff;
         box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: pointer; padding: 0;
@@ -131,15 +132,25 @@ function showSelectionIcon(text, rect) {
   const btn = shadow.querySelector("button");
   // Keep the text selected when the icon is pressed
   btn.addEventListener("mousedown", (e) => e.preventDefault());
-  btn.addEventListener("click", () => {
-    removeSelectionIcon();
-    startTranslation(text);
-  });
+  btn.addEventListener("click", () => startTranslation(text));
   document.body.appendChild(iconHost);
 }
 
+function isEditable(node) {
+  return (
+    node &&
+    (node.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(node.tagName))
+  );
+}
+
 document.addEventListener("mouseup", (e) => {
+  // Left button only: a right-click opens the context menu, which has its own entry
+  if (e.button !== 0) return;
+  // After an extension reload or update, this old script can no longer use chrome.* APIs
+  if (!chrome.runtime?.id) return;
   if (e.composedPath().includes(iconHost) || e.composedPath().includes(overlayHost)) return;
+  // Don't get in the way while the user is editing text
+  if (isEditable(e.composedPath()[0]) || isEditable(document.activeElement)) return;
   setTimeout(() => {
     const sel = window.getSelection();
     const text = sel ? sel.toString().trim() : "";
@@ -152,6 +163,7 @@ document.addEventListener("mouseup", (e) => {
 
 document.addEventListener("mousedown", (e) => {
   if (!e.composedPath().includes(iconHost)) removeSelectionIcon();
+  if (!e.composedPath().includes(overlayHost)) removeOverlay();
 });
 
 function getSelectionCoords() {
@@ -174,8 +186,19 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
   if (!coords) return;
   removeOverlay();
 
-  const spawnAtTop = window.innerHeight - coords.viewportBottom < 400;
-  const finalTop = spawnAtTop ? coords.top - 10 : coords.bottom + 10;
+  // Open on whichever side of the selection has room, and shrink the body to fit
+  const spaceBelow = window.innerHeight - coords.viewportBottom;
+  const spaceAbove = coords.rect.top;
+  let spawnAtTop = spaceBelow < 400 && spaceAbove > spaceBelow;
+  let finalTop = spawnAtTop ? coords.top - 10 : coords.bottom + 10;
+  let room = Math.max(spaceAbove, spaceBelow) - 18;
+  if (room < 240) {
+    // The selection fills the screen: overlap it, pinned inside the viewport
+    spawnAtTop = false;
+    room = Math.min(400, window.innerHeight - 16);
+    finalTop = window.scrollY + window.innerHeight - room - 8;
+  }
+  const bodyMaxHeight = Math.max(60, Math.min(280, room - 130)); // 130px = header, footer and body padding
   // Keep the 460px box inside the viewport horizontally
   const finalLeft = Math.max(
     window.scrollX + 8,
@@ -218,7 +241,7 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
       .rev-btn { background: none; border: none; cursor: pointer; color: var(--text); opacity: 0.3; font-size: 14px; transition: 0.2s; }
       .rev-btn:hover { opacity: 1; color: var(--accent); transform: rotate(180deg); }
 
-      .gt-body { padding: 16px; font-size: 18px; line-height: 1.6; max-height: 280px; overflow-y: auto; min-height: 60px; }
+      .gt-body { padding: 16px; font-size: 18px; line-height: 1.6; max-height: ${bodyMaxHeight}px; overflow-y: auto; min-height: 60px; }
 
       .romanized, .note { font-size: 14px; opacity: 0.65; margin-top: 4px; }
       .dict { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.5; }
@@ -283,7 +306,7 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
     const resEl = container.querySelector("#res");
 
     const fetchUpdate = () => {
-      requestTranslation(originalText, slEl.value, tlEl.value, resEl);
+      requestTranslation(originalText, slEl.value, tlEl.value, container);
     };
 
     container.querySelector("#rev-btn").onclick = () => {
@@ -343,8 +366,12 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
 
     container.querySelector("#spk").onclick = async () => {
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(resEl.innerText);
+      if (!lastResult) return; // Still loading, or the translation failed
+      const id = ++speakId;
+      const u = new SpeechSynthesisUtterance(lastResult);
       const voices = await loadVoices();
+      // A newer click, or closing the popup, cancels this one
+      if (id !== speakId) return;
       const best =
         voices.find(
           (v) =>
@@ -365,16 +392,7 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
   container.querySelector("#sl").value = initialSl;
   container.querySelector("#tl").value = initialTl;
 
-  const handleDocClick = (e) => {
-    if (!e.composedPath().includes(overlayHost)) removeOverlay();
-  };
-  setTimeout(() => document.addEventListener("mousedown", handleDocClick), 0);
-  requestTranslation(
-    originalText,
-    initialSl,
-    initialTl,
-    container.querySelector("#res"),
-  );
+  requestTranslation(originalText, initialSl, initialTl, container);
 }
 
 // Chrome loads speech voices asynchronously: getVoices() is empty on first use,
@@ -392,11 +410,30 @@ loadVoices(); // warm up so voices are ready by the time the user clicks speak
 
 // Only the latest request may write to the result box (avoids out-of-order responses)
 let requestId = 0;
-function requestTranslation(text, sl, tl, resEl) {
+let speakId = 0;
+let lastResult = ""; // The translation on screen, empty while loading or after a failure
+const translationCache = new Map(); // Repeat lookups skip Google, which rate-limits us
+const CACHE_LIMIT = 100;
+
+function requestTranslation(text, sl, tl, container) {
   const id = ++requestId;
-  const extraEl = resEl.parentElement.querySelector("#extra");
-  resEl.innerText = "...";
-  extraEl.replaceChildren();
+  // Look these up each time: the theme toggle rebuilds the popup while requests are in flight
+  const resEl = () => container.querySelector("#res");
+  const extraEl = () => container.querySelector("#extra");
+  const showGoogleResult = (r) => {
+    lastResult = r.translated;
+    resEl().innerText = r.translated;
+    renderExtra(extraEl(), r);
+  };
+
+  lastResult = "";
+  extraEl().replaceChildren();
+  const key = `${sl}|${tl}|${text}`;
+  if (translationCache.has(key)) {
+    showGoogleResult(translationCache.get(key));
+    return;
+  }
+  resEl().innerText = "...";
   chrome.runtime.sendMessage(
     { action: "fetchTranslation", text, sl, tl },
     async (r) => {
@@ -404,15 +441,19 @@ function requestTranslation(text, sl, tl, resEl) {
       const failed = chrome.runtime.lastError || !r || r.error || !r.translated;
       if (id !== requestId) return;
       if (!failed) {
-        resEl.innerText = r.translated;
-        renderExtra(extraEl, r);
+        translationCache.set(key, r);
+        if (translationCache.size > CACHE_LIMIT) {
+          translationCache.delete(translationCache.keys().next().value);
+        }
+        showGoogleResult(r);
         return;
       }
       const offline = await translateOnDevice(text, sl, tl);
       if (id !== requestId) return;
-      resEl.innerText = offline || "Translation failed. Please try again.";
+      lastResult = offline || "";
+      resEl().innerText = offline || "Translation failed. Please try again.";
       if (offline) {
-        extraEl.append(el("div", "note", "Translated on this device (Google was unavailable)"));
+        extraEl().append(el("div", "note", "Translated on this device (Google was unavailable)"));
       }
     },
   );
@@ -465,13 +506,18 @@ async function runOnDeviceTranslator(text, sl, tl) {
     if (sl === "auto") {
       if (!("LanguageDetector" in self)) return null;
       const detector = await LanguageDetector.create();
-      const results = await detector.detect(text);
-      source = results[0].detectedLanguage;
+      const [best] = await detector.detect(text);
+      detector.destroy();
+      // A low-confidence guess would give a wrong translation that looks right
+      if (!best || best.detectedLanguage === "und" || best.confidence < 0.5) return null;
+      source = best.detectedLanguage;
     }
     const pair = { sourceLanguage: toLocal(source), targetLanguage: toLocal(tl) };
     if ((await Translator.availability(pair)) === "unavailable") return null;
     const translator = await Translator.create(pair);
-    return await translator.translate(text);
+    const translated = await translator.translate(text);
+    translator.destroy();
+    return translated;
   } catch {
     return null;
   }
@@ -479,6 +525,7 @@ async function runOnDeviceTranslator(text, sl, tl) {
 
 function removeOverlay() {
   if (overlayHost) {
+    speakId++;
     window.speechSynthesis.cancel();
     overlayHost.remove();
     overlayHost = null;

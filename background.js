@@ -25,13 +25,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     const attempt = () =>
       fetch(url).then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
         return res.json();
       });
 
-    // gtx is unofficial and sometimes fails transiently (rate limit), so retry once
+    // Retry once for network and server errors. A 4xx (rate limit, text too long)
+    // won't succeed 600ms later, and more requests only make rate limiting worse.
     attempt()
-      .catch(() => new Promise(r => setTimeout(r, 600)).then(attempt))
+      .catch(err => {
+        if (err.status >= 400 && err.status < 500) throw err;
+        return new Promise(r => setTimeout(r, 600)).then(attempt);
+      })
       .then(data => {
         let translatedText = "";
         if (data && data[0]) {
