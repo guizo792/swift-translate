@@ -328,10 +328,10 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
       );
     };
 
-    container.querySelector("#spk").onclick = () => {
+    container.querySelector("#spk").onclick = async () => {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(resEl.innerText);
-      const voices = window.speechSynthesis.getVoices();
+      const voices = await loadVoices();
       const best =
         voices.find(
           (v) =>
@@ -363,6 +363,19 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
     container.querySelector("#res"),
   );
 }
+
+// Chrome loads speech voices asynchronously: getVoices() is empty on first use,
+// which made the first playback fall back to the poor default voice.
+function loadVoices() {
+  return new Promise((resolve) => {
+    const v = window.speechSynthesis.getVoices();
+    if (v.length) return resolve(v);
+    const done = () => resolve(window.speechSynthesis.getVoices());
+    window.speechSynthesis.addEventListener("voiceschanged", done, { once: true });
+    setTimeout(done, 1000);
+  });
+}
+loadVoices(); // warm up so voices are ready by the time the user clicks speak
 
 // Only the latest request may write to the result box (avoids out-of-order responses)
 let requestId = 0;

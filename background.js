@@ -19,8 +19,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetchTranslation") {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${request.sl}&tl=${request.tl}&dt=t&q=${encodeURIComponent(request.text)}`;
     
-    fetch(url)
-      .then(res => res.json())
+    const attempt = () =>
+      fetch(url).then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      });
+
+    // gtx is unofficial and sometimes fails transiently (rate limit), so retry once
+    attempt()
+      .catch(() => new Promise(r => setTimeout(r, 600)).then(attempt))
       .then(data => {
         let translatedText = "";
         if (data && data[0]) {
