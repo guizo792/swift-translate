@@ -174,7 +174,7 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
   if (!coords) return;
   removeOverlay();
 
-  const spawnAtTop = window.innerHeight - coords.viewportBottom < 320;
+  const spawnAtTop = window.innerHeight - coords.viewportBottom < 400;
   const finalTop = spawnAtTop ? coords.top - 10 : coords.bottom + 10;
   // Keep the 460px box inside the viewport horizontally
   const finalLeft = Math.max(
@@ -220,6 +220,13 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
 
       .gt-body { padding: 16px; font-size: 18px; line-height: 1.6; max-height: 280px; overflow-y: auto; min-height: 60px; }
 
+      .romanized, .note { font-size: 14px; opacity: 0.65; margin-top: 4px; }
+      .dict { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.5; }
+      .pos { color: var(--accent); font-weight: 700; font-size: 12px; text-transform: capitalize; margin-top: 8px; }
+      .def-example, .synonyms { opacity: 0.65; }
+      .def-example { font-style: italic; }
+      .dict ol { margin: 2px 0; padding-left: 20px; }
+
       .gt-footer { display: flex; align-items: center; justify-content: flex-end; padding: 6px 12px; background: var(--footer); border-top: 1px solid var(--border); gap: 6px; }
 
       .icon-btn {
@@ -260,7 +267,7 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
         </div>
         <button id="theme-btn" class="icon-btn">${isDark ? iconSun : iconMoon}</button>
       </div>
-      <div class="gt-body" id="res">...</div>
+      <div class="gt-body"><div id="res">...</div><div id="extra"></div></div>
       <div class="gt-footer">
         <button id="spk" class="icon-btn" title="Speak">${iconVol}</button>
         <button id="search" class="icon-btn" title="Search on Google">${iconWeb}</button>
@@ -300,7 +307,12 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
     };
 
     container.querySelector("#theme-btn").onclick = () => {
-      const state = { sl: slEl.value, tl: tlEl.value, res: resEl.innerText };
+      const state = {
+        sl: slEl.value,
+        tl: tlEl.value,
+        res: resEl.innerText,
+        extra: Array.from(container.querySelector("#extra").childNodes),
+      };
       isDark = !isDark;
       chrome.storage.sync.set({ theme: isDark ? "dark" : "light" });
       updateStyles();
@@ -308,6 +320,7 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
       container.querySelector("#sl").value = state.sl;
       container.querySelector("#tl").value = state.tl;
       container.querySelector("#res").innerText = state.res;
+      container.querySelector("#extra").append(...state.extra);
     };
 
     container.querySelector("#cpy").onclick = (e) => {
@@ -381,18 +394,87 @@ loadVoices(); // warm up so voices are ready by the time the user clicks speak
 let requestId = 0;
 function requestTranslation(text, sl, tl, resEl) {
   const id = ++requestId;
+  const extraEl = resEl.parentElement.querySelector("#extra");
   resEl.innerText = "...";
+  extraEl.replaceChildren();
   chrome.runtime.sendMessage(
     { action: "fetchTranslation", text, sl, tl },
-    (r) => {
+    async (r) => {
+      // lastError must be read before the first await
+      const failed = chrome.runtime.lastError || !r || r.error || !r.translated;
       if (id !== requestId) return;
-      if (chrome.runtime.lastError || !r || r.error || !r.translated) {
-        resEl.innerText = "Translation failed. Please try again.";
+      if (!failed) {
+        resEl.innerText = r.translated;
+        renderExtra(extraEl, r);
         return;
       }
-      resEl.innerText = r.translated;
+      const offline = await translateOnDevice(text, sl, tl);
+      if (id !== requestId) return;
+      resEl.innerText = offline || "Translation failed. Please try again.";
+      if (offline) {
+        extraEl.append(el("div", "note", "Translated on this device (Google was unavailable)"));
+      }
     },
   );
+}
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+function renderExtra(extraEl, { romanized, dictionary }) {
+  if (romanized) extraEl.append(el("div", "romanized", romanized));
+  if (!dictionary || !dictionary.length) return;
+
+  const dict = el("div", "dict");
+  dictionary.forEach(({ pos, terms, definitions, synonyms }) => {
+    if (pos) dict.append(el("div", "pos", pos));
+    if (terms.length) dict.append(el("div", "", terms.join(", ")));
+    if (definitions.length) {
+      const list = el("ol");
+      definitions.forEach(({ text, example }) => {
+        const item = el("li", "", text);
+        if (example) item.append(el("div", "def-example", `"${example}"`));
+        list.append(item);
+      });
+      dict.append(list);
+    }
+    if (synonyms.length) dict.append(el("div", "synonyms", `Similar: ${synonyms.join(", ")}`));
+  });
+  extraEl.append(dict);
+}
+
+// Chrome's built-in on-device translator, used when Google can't be reached.
+// Missing on older Chrome and on non-HTTPS pages, in which case this returns null.
+// These calls can hang (seen with Translator.availability), so give up after 8s
+// rather than leaving the popup on "..." forever.
+function translateOnDevice(text, sl, tl) {
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 8000));
+  return Promise.race([runOnDeviceTranslator(text, sl, tl), timeout]);
+}
+
+async function runOnDeviceTranslator(text, sl, tl) {
+  const toLocal = (code) =>
+    ({ "zh-CN": "zh", "zh-TW": "zh-Hant" })[code] || code;
+  try {
+    if (!("Translator" in self)) return null;
+    let source = sl;
+    if (sl === "auto") {
+      if (!("LanguageDetector" in self)) return null;
+      const detector = await LanguageDetector.create();
+      const results = await detector.detect(text);
+      source = results[0].detectedLanguage;
+    }
+    const pair = { sourceLanguage: toLocal(source), targetLanguage: toLocal(tl) };
+    if ((await Translator.availability(pair)) === "unavailable") return null;
+    const translator = await Translator.create(pair);
+    return await translator.translate(text);
+  } catch {
+    return null;
+  }
 }
 
 function removeOverlay() {

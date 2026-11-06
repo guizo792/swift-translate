@@ -17,8 +17,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // Listen for translation requests from the UI
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetchTranslation") {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${request.sl}&tl=${request.tl}&dt=t&q=${encodeURIComponent(request.text)}`;
-    
+    // Dictionary data only makes sense for a single word
+    const isWord = !/\s/.test(request.text.trim());
+    // dt=ex is what adds the example sentence to each definition in data[12]
+    const dt = isWord ? "&dt=bd&dt=md&dt=ss&dt=ex" : "";
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${request.sl}&tl=${request.tl}&dt=t&dt=rm${dt}&q=${encodeURIComponent(request.text)}`;
+
     const attempt = () =>
       fetch(url).then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -33,9 +37,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (data && data[0]) {
           data[0].forEach(segment => { if (segment[0]) translatedText += segment[0]; });
         }
-        sendResponse({ translated: translatedText });
+        // The romanization segment looks like [null, null, targetRomanized, sourceRomanized]
+        const romanized = data && data[0] ? data[0].map(segment => segment[2]).find(Boolean) : null;
+        sendResponse({
+          translated: translatedText,
+          romanized: romanized && romanized.toLowerCase() !== translatedText.toLowerCase() ? romanized : null,
+          dictionary: isWord ? parseDictionary(data) : [],
+        });
       })
       .catch(err => sendResponse({ error: err.message }));
     return true; // Keep channel open for async response
   }
 });
+
+// Merges gtx's translations (data[1]), synonyms (data[11]) and definitions (data[12]) by part of speech
+function parseDictionary(data) {
+  const byPos = new Map();
+  const entry = pos => {
+    if (!byPos.has(pos)) byPos.set(pos, { pos, terms: [], definitions: [], synonyms: [] });
+    return byPos.get(pos);
+  };
+  (data[1] || []).forEach(([pos, terms]) => {
+    entry(pos).terms = (terms || []).slice(0, 5);
+  });
+  (data[12] || []).forEach(([pos, definitions]) => {
+    entry(pos).definitions = (definitions || []).slice(0, 3).map(([text, , example]) => ({ text, example }));
+  });
+  (data[11] || []).forEach(([pos, groups]) => {
+    // Groups with a label (g[2]) are niche usage like "literary", so leave them out
+    const words = (groups || []).filter(g => !g[2]).flatMap(g => g[0] || []);
+    entry(pos).synonyms = [...new Set(words)].slice(0, 6);
+  });
+  return [...byPos.values()];
+}
