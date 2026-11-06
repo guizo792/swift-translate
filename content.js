@@ -76,23 +76,82 @@ const LANGUAGES = {
   vi: "Vietnamese",
 };
 
+function startTranslation(text) {
+  const coords = getSelectionCoords();
+  chrome.storage.sync.get(
+    {
+      sourceLang: "auto",
+      targetLang: "en",
+      theme: window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light",
+    },
+    (data) => {
+      isDark = data.theme === "dark";
+      showOverlay(text, data.sourceLang, data.targetLang, coords);
+    },
+  );
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "initiateTranslation") {
-    const coords = getSelectionCoords();
-    chrome.storage.sync.get(
-      {
-        sourceLang: "auto",
-        targetLang: "en",
-        theme: window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light",
-      },
-      (data) => {
-        isDark = data.theme === "dark";
-        showOverlay(request.text, data.sourceLang, data.targetLang, coords);
-      },
-    );
+    startTranslation(request.text);
   }
+});
+
+// --- Selection popup: small icon that appears next to selected text ---
+let iconHost = null;
+
+function removeSelectionIcon() {
+  if (iconHost) {
+    iconHost.remove();
+    iconHost = null;
+  }
+}
+
+function showSelectionIcon(text, rect) {
+  removeSelectionIcon();
+  iconHost = document.createElement("div");
+  const shadow = iconHost.attachShadow({ mode: "open" });
+  shadow.innerHTML = `
+    <style>
+      button {
+        position: absolute; z-index: 2147483647; width: 30px; height: 30px;
+        top: ${rect.bottom + window.scrollY + 6}px;
+        left: ${Math.max(8, Math.min(rect.right + window.scrollX, window.scrollX + window.innerWidth - 38))}px;
+        border-radius: 50%; border: 1px solid #dadce0; background: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: pointer; padding: 0;
+        display: flex; align-items: center; justify-content: center;
+      }
+      button:hover { background: #f1f3f4; }
+      svg { width: 18px; height: 18px; fill: #1a73e8; }
+    </style>
+    <button title="Translate"><svg viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg></button>
+  `;
+  const btn = shadow.querySelector("button");
+  // Keep the text selected when the icon is pressed
+  btn.addEventListener("mousedown", (e) => e.preventDefault());
+  btn.addEventListener("click", () => {
+    removeSelectionIcon();
+    startTranslation(text);
+  });
+  document.body.appendChild(iconHost);
+}
+
+document.addEventListener("mouseup", (e) => {
+  if (e.composedPath().includes(iconHost) || e.composedPath().includes(overlayHost)) return;
+  setTimeout(() => {
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : "";
+    if (!text || sel.rangeCount === 0) return;
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    if (!rect.width && !rect.height) return;
+    showSelectionIcon(text, rect);
+  }, 0);
+});
+
+document.addEventListener("mousedown", (e) => {
+  if (!e.composedPath().includes(iconHost)) removeSelectionIcon();
 });
 
 function getSelectionCoords() {
@@ -117,6 +176,11 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
 
   const spawnAtTop = window.innerHeight - coords.viewportBottom < 320;
   const finalTop = spawnAtTop ? coords.top - 10 : coords.bottom + 10;
+  // Keep the 460px box inside the viewport horizontally
+  const finalLeft = Math.max(
+    window.scrollX + 8,
+    Math.min(coords.left, window.scrollX + window.innerWidth - 460 - 16),
+  );
 
   overlayHost = document.createElement("div");
   const shadow = overlayHost.attachShadow({ mode: "open" });
@@ -126,8 +190,6 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
   const style = document.createElement("style");
   const updateStyles = () => {
     style.textContent = `
-      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
       :host {
         --bg: ${isDark ? "#2d2e31" : "#ffffff"};
         --text: ${isDark ? "#e8eaed" : "#202124"};
@@ -137,10 +199,10 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
         --hover: ${isDark ? "#3c4043" : "#f1f3f4"};
       }
       .gt-box {
-        position: absolute; top: ${finalTop}px; left: ${coords.left}px;
-        z-index: 2147483647; width: 460px; background: var(--bg);
+        position: absolute; top: ${finalTop}px; left: ${finalLeft}px;
+        z-index: 2147483647; width: 460px; max-width: calc(100vw - 16px); background: var(--bg);
         border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
         border: 1px solid var(--border); color: var(--text);
         overflow: hidden; display: flex; flex-direction: column;
         ${spawnAtTop ? "transform: translateY(-100%);" : ""}
@@ -214,18 +276,7 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
     const resEl = container.querySelector("#res");
 
     const fetchUpdate = () => {
-      resEl.innerText = "...";
-      chrome.runtime.sendMessage(
-        {
-          action: "fetchTranslation",
-          text: originalText,
-          sl: slEl.value,
-          tl: tlEl.value,
-        },
-        (r) => {
-          resEl.innerText = r.translated || "Error";
-        },
-      );
+      requestTranslation(originalText, slEl.value, tlEl.value, resEl);
     };
 
     container.querySelector("#rev-btn").onclick = () => {
@@ -305,15 +356,28 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
     if (!e.composedPath().includes(overlayHost)) removeOverlay();
   };
   setTimeout(() => document.addEventListener("mousedown", handleDocClick), 0);
+  requestTranslation(
+    originalText,
+    initialSl,
+    initialTl,
+    container.querySelector("#res"),
+  );
+}
+
+// Only the latest request may write to the result box (avoids out-of-order responses)
+let requestId = 0;
+function requestTranslation(text, sl, tl, resEl) {
+  const id = ++requestId;
+  resEl.innerText = "...";
   chrome.runtime.sendMessage(
-    {
-      action: "fetchTranslation",
-      text: originalText,
-      sl: initialSl,
-      tl: initialTl,
-    },
+    { action: "fetchTranslation", text, sl, tl },
     (r) => {
-      container.querySelector("#res").innerText = r.translated || "Error";
+      if (id !== requestId) return;
+      if (chrome.runtime.lastError || !r || r.error || !r.translated) {
+        resEl.innerText = "Translation failed. Please try again.";
+        return;
+      }
+      resEl.innerText = r.translated;
     },
   );
 }
