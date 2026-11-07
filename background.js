@@ -14,6 +14,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
+// The toolbar button opens the saved-words page
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("vocab.html") });
+});
+
 // Listen for translation requests from the UI
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetchTranslation") {
@@ -45,6 +50,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const romanized = data && data[0] ? data[0].map(segment => segment[2]).find(Boolean) : null;
         sendResponse({
           translated: translatedText,
+          detected: data && data[2],
           romanized: romanized && romanized.toLowerCase() !== translatedText.toLowerCase() ? romanized : null,
           dictionary: isWord ? parseDictionary(data) : [],
         });

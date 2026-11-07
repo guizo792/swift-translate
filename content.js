@@ -76,9 +76,32 @@ const LANGUAGES = {
   vi: "Vietnamese",
 };
 
+// The sentence a short selection came from, saved with the word as a reminder of its meaning
+function getContextSentence(text) {
+  const sel = window.getSelection();
+  const word = text.replace(/\s+/g, " ").trim();
+  if (!sel || !sel.rangeCount || word.length > 120) return "";
+  let node = sel.getRangeAt(0).commonAncestorContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+  // Climb out of inline tags (<b>, <a>) so the sentence isn't cut short
+  while (node && node.parentElement && getComputedStyle(node).display.startsWith("inline")) {
+    node = node.parentElement;
+  }
+  const block = (node ? node.textContent : "").replace(/\s+/g, " ");
+  const at = block.indexOf(word);
+  if (at < 0) return "";
+  let start = 0;
+  for (const sentence of block.match(/[^.!?]+[.!?]*\s*/g) || []) {
+    if (at < start + sentence.length) return sentence.trim().slice(0, 300);
+    start += sentence.length;
+  }
+  return "";
+}
+
 function startTranslation(text) {
   removeSelectionIcon();
   const coords = getSelectionCoords();
+  const context = getContextSentence(text);
   chrome.storage.sync.get(
     {
       sourceLang: "auto",
@@ -89,7 +112,7 @@ function startTranslation(text) {
     },
     (data) => {
       isDark = data.theme === "dark";
-      showOverlay(text, data.sourceLang, data.targetLang, coords);
+      showOverlay(text, data.sourceLang, data.targetLang, coords, context);
     },
   );
 }
@@ -182,7 +205,7 @@ function getSelectionCoords() {
   return null;
 }
 
-function showOverlay(originalText, initialSl, initialTl, coords) {
+function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
   if (!coords) return;
   removeOverlay();
 
@@ -237,7 +260,8 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
       .header-controls { display: flex; align-items: center; gap: 4px; }
       .logo-icon { width: 18px; height: 18px; fill: var(--accent); margin-right: 4px; }
       
-      select { border: none; background: none; font-size: 14px; color: var(--accent); cursor: pointer; font-weight: 700; font-family: inherit; outline: none; }
+      select { border: none; background: none; font-size: 14px; color: var(--accent); cursor: pointer; font-weight: 700; font-family: inherit; outline: none; color-scheme: ${isDark ? "dark" : "light"}; }
+      select option { background: var(--bg); color: var(--text); font-weight: 500; }
       .rev-btn { background: none; border: none; cursor: pointer; color: var(--text); opacity: 0.3; font-size: 14px; transition: 0.2s; }
       .rev-btn:hover { opacity: 1; color: var(--accent); transform: rotate(180deg); }
 
@@ -261,6 +285,7 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
       .icon-btn:hover { opacity: 1; background: var(--hover); }
       .icon-btn:active { transform: scale(0.9); }
       .icon-btn.success { fill: #10b981; opacity: 1; background: rgba(16, 185, 129, 0.1); }
+      .icon-btn.saved { fill: #f5b400; opacity: 1; }
       .icon-btn svg { width: 18px; height: 18px; transition: 0.2s; }
       
       #spk { margin-right: auto; } /* Keep speaker on the left */
@@ -271,6 +296,8 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
     const iconVol = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>`;
     const iconCpy = `<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>`;
     const iconCheck = `<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
+    const iconStar = `<svg viewBox="0 0 24 24"><path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/></svg>`;
+    const iconStarFilled = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
     // New Web/Globe Icon
     const iconWeb = `<svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.987 7.987 0 0 1 5.08 16zm2.95-8H5.08a7.987 7.987 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>`;
     const iconSun = `<svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L5.99 4.58zm12.02 12.02a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42zM18.01 4.58a.996.996 0 00-1.41 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42a.996.996 0 00-1.41 0zM5.99 16.6a.996.996 0 00-1.41 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42z"/></svg>`;
@@ -293,14 +320,15 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
       <div class="gt-body"><div id="res">...</div><div id="extra"></div></div>
       <div class="gt-footer">
         <button id="spk" class="icon-btn" title="Speak">${iconVol}</button>
+        <button id="star" class="icon-btn" title="Save to vocabulary">${iconStar}</button>
         <button id="search" class="icon-btn" title="Search on Google">${iconWeb}</button>
         <button id="cpy" class="icon-btn" title="Copy">${iconCpy}</button>
       </div>
     `;
-    setupEventListeners(iconCpy, iconCheck);
+    setupEventListeners(iconCpy, iconCheck, iconStar, iconStarFilled);
   };
 
-  const setupEventListeners = (iconCpy, iconCheck) => {
+  const setupEventListeners = (iconCpy, iconCheck, iconStar, iconStarFilled) => {
     const slEl = container.querySelector("#sl");
     const tlEl = container.querySelector("#tl");
     const resEl = container.querySelector("#res");
@@ -344,7 +372,41 @@ function showOverlay(originalText, initialSl, initialTl, coords) {
       container.querySelector("#tl").value = state.tl;
       container.querySelector("#res").innerText = state.res;
       container.querySelector("#extra").append(...state.extra);
+      container.onresult(); // The star was checked before the language was restored
     };
+
+    // Saved words live in storage.local (storage.sync is capped at 8KB per item)
+    const starEl = container.querySelector("#star");
+    const isSame = (v) =>
+      v.text.toLowerCase() === originalText.toLowerCase() && v.tl === tlEl.value;
+    const refreshStar = () => {
+      chrome.storage.local.get({ vocab: [] }, ({ vocab }) => {
+        const saved = vocab.some(isSame);
+        starEl.classList.toggle("saved", saved);
+        starEl.innerHTML = saved ? iconStarFilled : iconStar;
+        starEl.title = saved ? "Remove from vocabulary" : "Save to vocabulary";
+      });
+    };
+    starEl.onclick = () => {
+      chrome.storage.local.get({ vocab: [] }, ({ vocab }) => {
+        const rest = vocab.filter((v) => !isSame(v));
+        if (rest.length === vocab.length) {
+          if (!lastResult) return; // Nothing to save until a translation arrives
+          rest.push({
+            id: Date.now(),
+            text: originalText,
+            translation: lastResult,
+            sl: lastDetected || slEl.value,
+            tl: tlEl.value,
+            context,
+            savedAt: Date.now(),
+          });
+        }
+        chrome.storage.local.set({ vocab: rest }, refreshStar);
+      });
+    };
+    container.onresult = refreshStar; // requestTranslation calls this when a result arrives
+    refreshStar();
 
     container.querySelector("#cpy").onclick = (e) => {
       const btn = e.currentTarget;
@@ -412,6 +474,7 @@ loadVoices(); // warm up so voices are ready by the time the user clicks speak
 let requestId = 0;
 let speakId = 0;
 let lastResult = ""; // The translation on screen, empty while loading or after a failure
+let lastDetected = ""; // Source language Google detected for lastResult
 const translationCache = new Map(); // Repeat lookups skip Google, which rate-limits us
 const CACHE_LIMIT = 100;
 
@@ -422,11 +485,14 @@ function requestTranslation(text, sl, tl, container) {
   const extraEl = () => container.querySelector("#extra");
   const showGoogleResult = (r) => {
     lastResult = r.translated;
+    lastDetected = r.detected || "";
     resEl().innerText = r.translated;
     renderExtra(extraEl(), r);
+    if (container.onresult) container.onresult();
   };
 
   lastResult = "";
+  lastDetected = "";
   extraEl().replaceChildren();
   const key = `${sl}|${tl}|${text}`;
   if (translationCache.has(key)) {
@@ -454,6 +520,7 @@ function requestTranslation(text, sl, tl, container) {
       resEl().innerText = offline || "Translation failed. Please try again.";
       if (offline) {
         extraEl().append(el("div", "note", "Translated on this device (Google was unavailable)"));
+        if (container.onresult) container.onresult();
       }
     },
   );

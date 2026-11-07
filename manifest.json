@@ -19,6 +19,9 @@
       "js": ["content.js"]
     }
   ],
+  "action": {
+    "default_title": "Saved words"
+  },
   "options_page": "options.html",
   "icons": {
     "48": "icons/48.png",
