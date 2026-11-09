@@ -1,0 +1,15 @@
+{
+  "name": "swift-translate-store-assets",
+  "private": true,
+  "type": "module",
+  "description": "Makes the Chrome Web Store screenshots and the README demo GIF from the real extension.",
+  "scripts": {
+    "screenshots": "node screenshots.mjs",
+    "demo": "node demo.mjs"
+  },
+  "dependencies": {
+    "gifenc": "^1.0.3",
+    "playwright-core": "1.65.0",
+    "pngjs": "^7.0.0"
+  }
+}
