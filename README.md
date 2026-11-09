@@ -2,7 +2,7 @@
 
 [![Available in the Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Available-blue?logo=google-chrome)](https://chromewebstore.google.com/detail/swift-translate/hafokdakniodjmpndpffmlabiolpgejb)
 
-**Swift Translate** is a lightweight, elegant Chrome extension that brings a mini Google Translate overlay directly to the text you're reading. No tab-switching, no clunky popups—just highlight, click, and understand.
+**Swift Translate** is a lightweight, elegant Chrome extension that brings a mini Google Translate overlay directly to the text you're reading. No tab-switching, no clunky popups, just highlight, click, and understand.
 
 Built for personal use to fix the frustration of breaking flow while reading articles, and open-sourced for anyone to use or improve!
 
