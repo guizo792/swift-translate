@@ -5,7 +5,8 @@
   "description": "Makes the Chrome Web Store screenshots and the README demo GIF from the real extension.",
   "scripts": {
     "screenshots": "node screenshots.mjs",
-    "demo": "node demo.mjs"
+    "demo": "node demo.mjs",
+    "promo": "node promo-tile.mjs"
   },
   "dependencies": {
     "gifenc": "^1.0.3",
