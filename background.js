@@ -14,13 +14,40 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
+const toBase64 = (buffer) => {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+};
+
+const openVocab = () => chrome.tabs.create({ url: chrome.runtime.getURL("vocab.html") });
+
 // The toolbar button opens the saved-words page
-chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("vocab.html") });
-});
+chrome.action.onClicked.addListener(openVocab);
 
 // Listen for translation requests from the UI
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // A content script can't open an extension page itself
+  if (request.action === "openVocab") {
+    openVocab();
+    return;
+  }
+  // Google's own spoken audio, which sounds the same as in Google Translate and covers
+  // languages like Arabic that many computers have no installed voice for
+  if (request.action === "fetchSpeech") {
+    const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${request.lang}&q=${encodeURIComponent(request.text)}`;
+    fetch(url)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.arrayBuffer();
+      })
+      .then(buffer => sendResponse({ dataUrl: `data:audio/mpeg;base64,${toBase64(buffer)}` }))
+      .catch(err => sendResponse({ error: err.message }));
+    return true;
+  }
   if (request.action === "fetchTranslation") {
     // Dictionary data only makes sense for a single word
     const isWord = !/\s/.test(request.text.trim());

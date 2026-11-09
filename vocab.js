@@ -23,7 +23,7 @@ function el(tag, className, text) {
 function render() {
   const query = searchEl.value.trim().toLowerCase();
   const shown = vocab
-    .filter((v) => [v.text, v.translation, v.context].join(" ").toLowerCase().includes(query))
+    .filter((v) => [v.text, v.translation].join(" ").toLowerCase().includes(query))
     .sort((a, b) => b.savedAt - a.savedAt);
 
   countEl.textContent = `${vocab.length} saved`;

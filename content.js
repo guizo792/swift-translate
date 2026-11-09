@@ -135,6 +135,19 @@ function removeSelectionIcon() {
 
 function showSelectionIcon(text, rect) {
   removeSelectionIcon();
+  // Match the popup's theme, which the user picks with the sun/moon button
+  chrome.storage.sync.get(
+    { theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" },
+    ({ theme }) => {
+      // The selection may have changed while storage was being read
+      if (window.getSelection().toString().trim() !== text) return;
+      buildSelectionIcon(text, rect, theme === "dark");
+    },
+  );
+}
+
+function buildSelectionIcon(text, rect, dark) {
+  removeSelectionIcon();
   iconHost = document.createElement("div");
   const shadow = iconHost.attachShadow({ mode: "open" });
   shadow.innerHTML = `
@@ -143,12 +156,13 @@ function showSelectionIcon(text, rect) {
         position: absolute; z-index: 2147483647; width: 30px; height: 30px;
         top: ${Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 38)) + window.scrollY}px;
         left: ${Math.max(8, Math.min(rect.right + window.scrollX, window.scrollX + window.innerWidth - 38))}px;
-        border-radius: 50%; border: 1px solid #dadce0; background: #fff;
+        border-radius: 8px; border: 1px solid ${dark ? "#3c4043" : "#dadce0"};
+        background: ${dark ? "#2d2e31" : "#ffffff"};
         box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: pointer; padding: 0;
         display: flex; align-items: center; justify-content: center;
       }
-      button:hover { background: #f1f3f4; }
-      svg { width: 18px; height: 18px; fill: #1a73e8; }
+      button:hover { background: ${dark ? "#3c4043" : "#f1f3f4"}; }
+      svg { width: 18px; height: 18px; fill: ${dark ? "#8ab4f8" : "#1a73e8"}; }
     </style>
     <button title="Translate"><svg viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg></button>
   `;
@@ -285,8 +299,7 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
       .icon-btn:hover { opacity: 1; background: var(--hover); }
       .icon-btn:active { transform: scale(0.9); }
       .icon-btn.success { fill: #10b981; opacity: 1; background: rgba(16, 185, 129, 0.1); }
-      .icon-btn.saved { fill: #f5b400; opacity: 1; }
-      .icon-btn svg { width: 18px; height: 18px; transition: 0.2s; }
+      .icon-btn.saved { fill: #f5b400; opacity: 1; }      .icon-btn svg { width: 18px; height: 18px; transition: 0.2s; }
       
       #spk { margin-right: auto; } /* Keep speaker on the left */
     `;
@@ -298,6 +311,7 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
     const iconCheck = `<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
     const iconStar = `<svg viewBox="0 0 24 24"><path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/></svg>`;
     const iconStarFilled = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
+    const iconBook = `<svg viewBox="0 0 24 24"><path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/></svg>`;
     // New Web/Globe Icon
     const iconWeb = `<svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.987 7.987 0 0 1 5.08 16zm2.95-8H5.08a7.987 7.987 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>`;
     const iconSun = `<svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L5.99 4.58zm12.02 12.02a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42zM18.01 4.58a.996.996 0 00-1.41 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42a.996.996 0 00-1.41 0zM5.99 16.6a.996.996 0 00-1.41 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42z"/></svg>`;
@@ -321,6 +335,7 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
       <div class="gt-footer">
         <button id="spk" class="icon-btn" title="Speak">${iconVol}</button>
         <button id="star" class="icon-btn" title="Save to vocabulary">${iconStar}</button>
+        <button id="vocab-btn" class="icon-btn" title="Saved words">${iconBook}</button>
         <button id="search" class="icon-btn" title="Search on Google">${iconWeb}</button>
         <button id="cpy" class="icon-btn" title="Copy">${iconCpy}</button>
       </div>
@@ -355,6 +370,10 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
     tlEl.onchange = () => {
       chrome.storage.sync.set({ targetLang: tlEl.value });
       fetchUpdate();
+    };
+
+    container.querySelector("#vocab-btn").onclick = () => {
+      chrome.runtime.sendMessage({ action: "openVocab" });
     };
 
     container.querySelector("#theme-btn").onclick = () => {
@@ -427,22 +446,23 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
     };
 
     container.querySelector("#spk").onclick = async () => {
-      window.speechSynthesis.cancel();
+      stopSpeaking();
       if (!lastResult) return; // Still loading, or the translation failed
-      const id = ++speakId;
-      const u = new SpeechSynthesisUtterance(lastResult);
-      const voices = await loadVoices();
-      // A newer click, or closing the popup, cancels this one
-      if (id !== speakId) return;
-      const best =
-        voices.find(
-          (v) =>
-            v.lang.startsWith(tlEl.value) &&
-            (v.name.includes("Google") || v.name.includes("Natural")),
-        ) || voices.find((v) => v.lang.startsWith(tlEl.value));
-      if (best) u.voice = best;
-      u.lang = tlEl.value;
-      window.speechSynthesis.speak(u);
+      const id = speakId;
+      // A newer click, or closing the popup, makes this one stale
+      const isStale = () => id !== speakId;
+      try {
+        await playGoogleSpeech(lastResult, tlEl.value, isStale);
+      } catch (err) {
+        // Google's audio was unreachable, or the page's security policy blocks audio
+        if (isStale()) return;
+        console.warn("[Swift Translate] Google voice failed:", err);
+        // Say why, since the device voice may be missing or in the wrong language
+        const extra = container.querySelector("#extra");
+        extra.querySelector(".voice-note")?.remove();
+        extra.append(el("div", "note voice-note", `Google voice failed (${err.message}). Using this device's voice.`));
+        await speakWithBrowserVoice(lastResult, tlEl.value, isStale);
+      }
     };
   };
 
@@ -457,22 +477,126 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
   requestTranslation(originalText, initialSl, initialTl, container);
 }
 
-// Chrome loads speech voices asynchronously: getVoices() is empty on first use,
-// which made the first playback fall back to the poor default voice.
-function loadVoices() {
+// Chrome fills in its voice list in stages: the first list can be empty, or hold only
+// the basic system voices, and the better "Google"/"Natural" ones arrive later through
+// "voiceschanged". Picking from the first list is what gave the poor default voice.
+const isGoodVoice = (v) => /Google|Natural|Neural|Online/.test(v.name);
+const voiceCache = new Map(); // language -> chosen voice, so only the first click per page can wait
+
+function pickVoice(lang) {
+  if (voiceCache.has(lang)) return Promise.resolve(voiceCache.get(lang));
+  const synth = window.speechSynthesis;
+  const matches = () => synth.getVoices().filter((v) => v.lang.startsWith(lang));
   return new Promise((resolve) => {
-    const v = window.speechSynthesis.getVoices();
-    if (v.length) return resolve(v);
-    const done = () => resolve(window.speechSynthesis.getVoices());
-    window.speechSynthesis.addEventListener("voiceschanged", done, { once: true });
-    setTimeout(done, 1000);
+    let timer;
+    const finish = () => {
+      synth.removeEventListener("voiceschanged", onChange);
+      clearTimeout(timer);
+      const voice = matches().find(isGoodVoice) || matches()[0] || null;
+      // Remember "no voice for this language" too, but only once the list has loaded
+      if (voice || synth.getVoices().length) voiceCache.set(lang, voice);
+      resolve(voice);
+    };
+    const onChange = () => {
+      if (matches().some(isGoodVoice)) finish();
+    };
+    if (matches().some(isGoodVoice)) return finish();
+    // Wait a little for a better voice, then settle for whatever exists
+    synth.addEventListener("voiceschanged", onChange);
+    timer = setTimeout(finish, 1500);
   });
 }
-loadVoices(); // warm up so voices are ready by the time the user clicks speak
+window.speechSynthesis.getVoices(); // starts the voice list loading before the first click
+
+async function speakWithBrowserVoice(text, lang, isStale) {
+  const u = new SpeechSynthesisUtterance(text);
+  const voice = await pickVoice(lang);
+  if (isStale()) return;
+  if (voice) u.voice = voice;
+  u.lang = lang;
+  window.speechSynthesis.speak(u);
+}
+
+// Google's audio endpoint rejects long text, so read long results in pieces
+function splitForSpeech(text, max = 180) {
+  const sentences = text.match(/[^.!?؟。！？\n]+[.!?؟。！？]*\s*/g) || [text];
+  const chunks = [];
+  let current = "";
+  for (const sentence of sentences) {
+    if ((current + sentence).length <= max) {
+      current += sentence;
+      continue;
+    }
+    if (current.trim()) chunks.push(current.trim());
+    current = "";
+    // A single sentence over the limit is cut at word boundaries
+    let rest = sentence;
+    while (rest.length > max) {
+      const cut = rest.lastIndexOf(" ", max);
+      const at = cut > 0 ? cut : max;
+      chunks.push(rest.slice(0, at).trim());
+      rest = rest.slice(at);
+    }
+    current = rest;
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
+async function playGoogleSpeech(text, lang, isStale) {
+  const clips = await Promise.all(
+    splitForSpeech(text).map(
+      (chunk) =>
+        new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ action: "fetchSpeech", text: chunk, lang }, (r) => {
+            if (chrome.runtime.lastError || !r || r.error) {
+              reject(new Error(`fetch: ${chrome.runtime.lastError?.message || r?.error || "no response"}`));
+            } else resolve(r.dataUrl);
+          });
+        }),
+    ),
+  );
+  // Web Audio plays from memory. An <audio> element loading a data: URL is blocked by
+  // the media-src policy of many sites (Google, GitHub, ...), and Web Audio is not.
+  audioContext ||= new AudioContext();
+  try {
+    await audioContext.resume();
+    const buffers = await Promise.all(
+      clips.map((dataUrl) => {
+        const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0));
+        return audioContext.decodeAudioData(bytes.buffer);
+      }),
+    );
+    for (const buffer of buffers) {
+      if (isStale()) return;
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContext.destination);
+      currentSource = source;
+      await new Promise((resolve) => {
+        source.onended = resolve;
+        source.start();
+      });
+    }
+  } catch (e) {
+    throw new Error(`play: ${e.name}`);
+  }
+}
+
+function stopSpeaking() {
+  speakId++;
+  window.speechSynthesis.cancel();
+  if (currentSource) {
+    currentSource.stop(); // Ends the pending clip, and the stale check ends the loop
+    currentSource = null;
+  }
+}
 
 // Only the latest request may write to the result box (avoids out-of-order responses)
 let requestId = 0;
 let speakId = 0;
+let currentSource = null; // The audio clip playing now
+let audioContext = null;
 let lastResult = ""; // The translation on screen, empty while loading or after a failure
 let lastDetected = ""; // Source language Google detected for lastResult
 const translationCache = new Map(); // Repeat lookups skip Google, which rate-limits us
@@ -592,8 +716,7 @@ async function runOnDeviceTranslator(text, sl, tl) {
 
 function removeOverlay() {
   if (overlayHost) {
-    speakId++;
-    window.speechSynthesis.cancel();
+    stopSpeaking();
     overlayHost.remove();
     overlayHost = null;
   }
