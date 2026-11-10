@@ -574,6 +574,14 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
     const srcEl = container.querySelector("#src");
     srcEl.textContent = originalText;
     const pageSentence = context; // what the page said around the original selection
+    // Used for edits and for the swap button. The saved sentence only helps if it still contains the text; it
+    // is always chosen from what the page said, so changing the text away and back brings it back.
+    const setOriginalText = (next) => {
+      originalText = next;
+      context = pageSentence.toLowerCase().includes(next.toLowerCase()) ? pageSentence : "";
+      srcEl.textContent = originalText;
+      container.onresult?.(); // the star was for the old text
+    };
     const startEdit = () => {
       if (srcEl.querySelector("textarea")) return;
       const area = document.createElement("textarea");
@@ -593,12 +601,7 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
         const next = area.value.trim();
         srcEl.classList.remove("editing");
         if (commit && next && next !== originalText.trim()) {
-          originalText = next;
-          // The saved sentence only helps if it still contains the word. It is always chosen from what the
-          // page said, so editing away from the word and back brings it back.
-          context = pageSentence.toLowerCase().includes(next.toLowerCase()) ? pageSentence : "";
-          srcEl.textContent = originalText;
-          container.onresult?.(); // the star was for the old text
+          setOriginalText(next);
           fetchUpdate();
         } else {
           srcEl.textContent = originalText;
@@ -627,10 +630,16 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
     srcEl.onclick = startEdit;
     container.querySelector("#src-edit").onclick = startEdit;
 
+    // Swapping turns the translation into the new original text, like Google Translate, so the result is a
+    // translation back. With no translation yet (still loading, or failed) only the languages swap.
     container.querySelector("#rev-btn").onclick = () => {
       const oldSl = slEl.value;
+      const translation = lastResult;
+      // With "Detect Language" the old source is whatever Google detected (it still calls Hebrew "iw").
+      const detected = lastDetected === "iw" ? "he" : lastDetected;
       slEl.value = tlEl.value;
-      tlEl.value = oldSl === "auto" ? "en" : oldSl;
+      tlEl.value = oldSl === "auto" ? (LANGUAGES[detected] ? detected : "en") : oldSl;
+      if (translation) setOriginalText(translation);
       chrome.storage.sync.set({
         sourceLang: slEl.value,
         targetLang: tlEl.value,
