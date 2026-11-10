@@ -91,7 +91,7 @@ async function readResult(page) {
   }
   return text;
 }
-const failed = (text) => text === '...' || text.startsWith('Translation failed');
+const failed = (text) => text === '...' || text.startsWith('Translation failed') || text.startsWith('Google is limiting');
 
 /** Waits out the gap since the last lookup. Call before clicking the icon. */
 export const pace = (page) => page.waitForTimeout(Math.max(0, lastLookup + LOOKUP_GAP - Date.now()));

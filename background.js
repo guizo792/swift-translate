@@ -23,6 +23,11 @@ const toBase64 = (buffer) => {
   return btoa(binary);
 };
 
+// Google refuses lookups that come too close together, and keeps refusing for a while. After a refusal we
+// stop sending translation requests for a short time: more requests only make the block last longer.
+const COOLDOWN_MS = 30_000;
+let blockedUntil = 0;
+
 const openVocab = () => chrome.tabs.create({ url: chrome.runtime.getURL("vocab.html") });
 
 // The toolbar button opens the saved-words page
@@ -49,6 +54,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.action === "fetchTranslation") {
+    if (Date.now() < blockedUntil) {
+      sendResponse({ error: "rate limited", rateLimited: true });
+      return;
+    }
     // Dictionary data only makes sense for a single word
     const isWord = !/\s/.test(request.text.trim());
     // dt=ex is what adds the example sentence to each definition in data[12]
@@ -82,7 +91,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           dictionary: isWord ? parseDictionary(data) : [],
         });
       })
-      .catch(err => sendResponse({ error: err.message }));
+      .catch(err => {
+        const rateLimited = err.status === 429;
+        if (rateLimited) blockedUntil = Date.now() + COOLDOWN_MS;
+        sendResponse({ error: err.message, rateLimited });
+      });
     return true; // Keep channel open for async response
   }
 });

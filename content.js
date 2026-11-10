@@ -641,7 +641,11 @@ function requestTranslation(text, sl, tl, container) {
       const offline = await translateOnDevice(text, sl, tl);
       if (id !== requestId) return;
       lastResult = offline || "";
-      resEl().innerText = offline || "Translation failed. Please try again.";
+      resEl().innerText =
+        offline ||
+        (r?.rateLimited
+          ? "Google is limiting requests right now. Try again in about 30 seconds."
+          : "Translation failed. Please try again.");
       if (offline) {
         extraEl().append(el("div", "note", "Translated on this device (Google was unavailable)"));
         if (container.onresult) container.onresult();
