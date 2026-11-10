@@ -482,6 +482,8 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
       .gt-body { padding: 16px; font-size: 18px; line-height: 1.6; max-height: ${bodyMaxHeight}px; overflow-y: auto; min-height: 60px; }
 
       .romanized, .note { font-size: 14px; opacity: 0.65; margin-top: 4px; }
+      .dict-toggle { display: block; margin-top: 8px; padding: 0; border: none; background: none; cursor: pointer; color: var(--text); font: inherit; font-size: 14px; text-decoration: underline; opacity: 0.65; }
+      .dict-toggle:hover { color: var(--accent); opacity: 1; }
       .dict { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.5; }
       .pos { color: var(--accent); font-weight: 700; font-size: 12px; text-transform: capitalize; margin-top: 8px; }
       .def-example, .synonyms { opacity: 0.65; }
@@ -881,7 +883,18 @@ function renderExtra(extraEl, { romanized, dictionary }) {
     }
     if (synonyms.length) dict.append(el("div", "synonyms", `Similar: ${synonyms.join(", ")}`));
   });
-  extraEl.append(dict);
+
+  // Hidden until asked for: the dictionary is long, and would stretch the popup every time.
+  dict.hidden = true;
+  const toggle = el("button", "dict-toggle", "See dictionary");
+  toggle.type = "button";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.addEventListener("click", () => {
+    dict.hidden = !dict.hidden;
+    toggle.textContent = dict.hidden ? "See dictionary" : "Hide dictionary";
+    toggle.setAttribute("aria-expanded", String(!dict.hidden));
+  });
+  extraEl.append(toggle, dict);
 }
 
 // Chrome's built-in on-device translator, used when Google can't be reached.

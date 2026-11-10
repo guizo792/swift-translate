@@ -85,6 +85,8 @@ try {
   );
   await openPopup(page);
   await saveWithStar();
+  await page.locator('.dict-toggle').click(); // the dictionary is hidden until asked for
+  await page.waitForTimeout(300);
   await make('02-dictionary.png', 'Meanings, examples and similar words', cropAround([toBox(word), await popupBox(page)], { pad: 36 }));
 
   // Two more words for the saved-words page.

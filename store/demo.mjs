@@ -84,7 +84,13 @@ try {
   await page.mouse.up();
   await snap(450); // "..." while Google answers
   await waitForTranslation(page);
-  await snap(2000);
+  await snap(1400);
+  // open the dictionary
+  await glide(await centreOf('.dict-toggle'), { steps: 8 });
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  await snap(2200);
   // save it
   await glide(await centreOf('#star'), { steps: 8 });
   await page.mouse.down();
