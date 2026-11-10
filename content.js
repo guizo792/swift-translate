@@ -447,6 +447,7 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
         --hover: ${isDark ? "#3c4043" : "#f1f3f4"};
       }
       .gt-box {
+        direction: ltr; /* the controls stay put on right-to-left pages; the texts choose their own direction */
         position: absolute; top: ${finalTop}px; left: ${finalLeft}px;
         z-index: 2147483647; width: 460px; max-width: calc(100vw - 16px); background: var(--bg);
         border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
@@ -467,7 +468,7 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
       .lang-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .lang-btn::after { content: ""; flex: none; border: 4px solid transparent; border-top-color: currentColor; border-bottom-width: 0; opacity: 0.7; }
       .lang-btn:hover, .lang-btn[aria-expanded="true"] { background: var(--hover); }
-      .lang-panel { position: absolute; z-index: 2147483647; width: 240px; display: flex; flex-direction: column; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 28px rgba(0,0,0,0.3); overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color-scheme: ${isDark ? "dark" : "light"}; }
+      .lang-panel { direction: ltr; position: absolute; z-index: 2147483647; width: 240px; display: flex; flex-direction: column; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 28px rgba(0,0,0,0.3); overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color-scheme: ${isDark ? "dark" : "light"}; }
       .lang-search { margin: 8px; padding: 8px 10px; font: inherit; font-size: 14px; color: var(--text); background: var(--footer); border: 1px solid var(--border); border-radius: 8px; outline: none; }
       .lang-search:focus { border-color: var(--accent); }
       .lang-list { position: relative; list-style: none; margin: 0; padding: 0 0 6px; overflow-y: auto; }
@@ -541,8 +542,8 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
         <button id="theme-btn" class="icon-btn">${isDark ? iconSun : iconMoon}</button>
       </div>
       <div class="gt-body">
-        <div class="src-row"><div id="src" class="src" title="Edit text"></div><button id="src-edit" class="src-edit" title="Edit text">${iconPencil}</button></div>
-        <div id="res">...</div><div id="extra"></div>
+        <div class="src-row"><div id="src" class="src" dir="auto" title="Edit text"></div><button id="src-edit" class="src-edit" title="Edit text">${iconPencil}</button></div>
+        <div id="res" dir="auto">...</div><div id="extra"></div>
       </div>
       <div class="gt-footer">
         <button id="spk" class="icon-btn" title="Speak">${iconVol}</button>
@@ -589,6 +590,7 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
       area.rows = 1;
       area.value = originalText;
       area.spellcheck = false;
+      area.dir = "auto";
       const fit = () => {
         area.style.height = "auto";
         // scrollHeight leaves out the border, which would leave a sliver that scrolls
@@ -941,7 +943,10 @@ function requestTranslation(text, sl, tl, container) {
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text) node.textContent = text;
+  if (text) {
+    node.textContent = text;
+    node.dir = "auto"; // each text takes its direction from its own content, not from the page
+  }
   return node;
 }
 
