@@ -106,12 +106,14 @@ function startTranslation(text) {
     {
       sourceLang: "auto",
       targetLang: "en",
+      recentLangs: [],
       theme: window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light",
     },
     (data) => {
       isDark = data.theme === "dark";
+      recentLanguages = data.recentLangs;
       showOverlay(text, data.sourceLang, data.targetLang, coords, context);
     },
   );
@@ -219,6 +221,192 @@ function getSelectionCoords() {
   return null;
 }
 
+// How well a language matches what was typed: lower is better, -1 is no match.
+function matchRank(name, code, query) {
+  const n = name.toLowerCase();
+  const c = code.toLowerCase();
+  if (n.startsWith(query) || c === query) return 0;
+  if (n.split(/[\s(]+/).some((word) => word.startsWith(query))) return 1;
+  if (n.includes(query)) return 2;
+  if (c.startsWith(query)) return 3;
+  return -1;
+}
+
+const RECENT_LANGUAGES = 3;
+let recentLanguages = []; // loaded when a popup opens, so a picker can open without waiting for storage
+
+function rememberLanguage(code) {
+  if (code === "auto") return;
+  recentLanguages = [code, ...recentLanguages.filter((c) => c !== code)].slice(0, RECENT_LANGUAGES);
+  chrome.storage.sync.set({ recentLangs: recentLanguages });
+}
+
+// A language chooser with a search box, in place of a plain <select>. To the rest of the code it looks like
+// one: it has a `value`, and calls `onchange` when the user picks a language. The list opens in a panel next
+// to the popup (not inside it, so it isn't clipped by the popup's edges).
+function createLanguagePicker(shadow, id, { includeAuto }) {
+  const root = document.createElement("div");
+  root.id = id;
+  root.className = "lang-picker";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "lang-btn";
+  button.setAttribute("aria-haspopup", "listbox");
+  button.setAttribute("aria-expanded", "false");
+  const label = document.createElement("span");
+  button.append(label);
+  root.append(button);
+
+  const entries = Object.entries(LANGUAGES).filter(([code]) => includeAuto || code !== "auto");
+  let value = includeAuto ? "auto" : "en";
+  const show = () => {
+    label.textContent = LANGUAGES[value] ?? value;
+    root.dataset.value = value;
+  };
+  Object.defineProperty(root, "value", {
+    get: () => value,
+    set: (v) => {
+      value = v;
+      show();
+    },
+  });
+  show();
+
+  let panel = null;
+  let stopListening = () => {};
+  const close = () => {
+    stopListening();
+    panel?.remove();
+    panel = null;
+    button.setAttribute("aria-expanded", "false");
+  };
+
+  const open = (recent) => {
+    shadow.querySelectorAll(".lang-panel").forEach((p) => p.remove());
+    panel = document.createElement("div");
+    panel.className = "lang-panel";
+    const input = document.createElement("input");
+    input.className = "lang-search";
+    input.type = "text";
+    input.placeholder = "Search languages";
+    input.setAttribute("aria-label", "Search languages");
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    const list = document.createElement("ul");
+    list.className = "lang-list";
+    list.setAttribute("role", "listbox");
+    panel.append(input, list);
+
+    // Below the button if there is room, otherwise above it, and never off the window's edge. It is placed in
+    // page coordinates like the popup itself, so it stays with the button when the page scrolls.
+    const rect = button.getBoundingClientRect();
+    const below = window.innerHeight - rect.bottom - 12;
+    const above = rect.top - 12;
+    const openUp = below < 240 && above > below;
+    panel.style.left = `${window.scrollX + Math.max(8, Math.min(rect.left, window.innerWidth - 248))}px`;
+    panel.style.maxHeight = `${Math.min(320, openUp ? above : below)}px`;
+    panel.style.top = `${window.scrollY + rect.bottom + 4}px`;
+    shadow.append(panel);
+    if (openUp) panel.style.top = `${window.scrollY + rect.top - panel.offsetHeight - 4}px`;
+    button.setAttribute("aria-expanded", "true");
+
+    let options = [];
+    let active = 0;
+    const setActive = (index) => {
+      options[active]?.classList.remove("active");
+      active = index;
+      const li = options[active];
+      if (!li) return;
+      li.classList.add("active");
+      if (li.offsetTop < list.scrollTop) list.scrollTop = li.offsetTop;
+      else if (li.offsetTop + li.offsetHeight > list.scrollTop + list.clientHeight) {
+        list.scrollTop = li.offsetTop + li.offsetHeight - list.clientHeight;
+      }
+    };
+    const choose = (code) => {
+      value = code;
+      show();
+      rememberLanguage(code);
+      close();
+      button.focus();
+      root.onchange?.();
+    };
+    const add = (tag, className, text) => {
+      const li = document.createElement(tag);
+      li.className = className;
+      li.textContent = text;
+      list.append(li);
+      return li;
+    };
+    const addOption = ([code, name]) => {
+      const li = add("li", `lang-option${code === value ? " current" : ""}`, name);
+      li.setAttribute("role", "option");
+      li.dataset.value = code;
+      li.addEventListener("click", () => choose(code));
+      li.addEventListener("mousemove", () => {
+        if (options[active] !== li) setActive(options.indexOf(li));
+      });
+      options.push(li);
+    };
+
+    const draw = () => {
+      const query = input.value.trim().toLowerCase();
+      list.replaceChildren();
+      options = [];
+      if (query) {
+        entries
+          .map((entry) => [matchRank(entry[1], entry[0], query), entry])
+          .filter(([rank]) => rank >= 0)
+          .sort((a, b) => a[0] - b[0]) // a stable sort: equal matches stay in alphabetical order
+          .forEach(([, entry]) => addOption(entry));
+        if (!options.length) add("li", "lang-empty", "No language found");
+        setActive(0);
+        return;
+      }
+      const recents = recent.map((code) => entries.find(([c]) => c === code)).filter(Boolean);
+      if (recents.length) {
+        add("li", "lang-heading", "Recent").setAttribute("role", "presentation");
+        recents.forEach(addOption);
+        add("li", "lang-heading", "All languages").setAttribute("role", "presentation");
+      }
+      entries.forEach(addOption);
+      setActive(Math.max(0, options.findIndex((li) => li.dataset.value === value)));
+    };
+    draw();
+
+    input.addEventListener("input", draw);
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation(); // typing here must not trigger the page's own keyboard shortcuts
+      if (e.isComposing) return;
+      if (e.key === "ArrowDown" && options.length) setActive((active + 1) % options.length);
+      else if (e.key === "ArrowUp" && options.length) setActive((active - 1 + options.length) % options.length);
+      else if (e.key === "Enter" && options[active]) choose(options[active].dataset.value);
+      else if (e.key === "Escape") {
+        close();
+        button.focus();
+      } else return;
+      e.preventDefault();
+    });
+    for (const type of ["keyup", "keypress"]) input.addEventListener(type, (e) => e.stopPropagation());
+
+    // Close on a click elsewhere in the popup, or when the window is resized.
+    const onMouseDown = (e) => {
+      const path = e.composedPath();
+      if (!path.includes(panel) && !path.includes(button)) close();
+    };
+    shadow.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("resize", close);
+    stopListening = () => {
+      shadow.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("resize", close);
+    };
+    input.focus({ preventScroll: true });
+  };
+
+  button.addEventListener("click", () => (panel?.isConnected ? close() : open(recentLanguages)));
+  return root;
+}
+
 function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
   if (!coords) return;
   removeOverlay();
@@ -274,8 +462,20 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
       .header-controls { display: flex; align-items: center; gap: 4px; }
       .logo-icon { width: 18px; height: 18px; fill: var(--accent); margin-right: 4px; }
       
-      select { border: none; background: none; font-size: 14px; color: var(--accent); cursor: pointer; font-weight: 700; font-family: inherit; outline: none; color-scheme: ${isDark ? "dark" : "light"}; }
-      select option { background: var(--bg); color: var(--text); font-weight: 500; }
+      .lang-picker { position: relative; }
+      .lang-btn { display: flex; align-items: center; gap: 6px; max-width: 170px; padding: 6px 8px; border: none; border-radius: 8px; background: none; cursor: pointer; color: var(--accent); font: inherit; font-size: 14px; font-weight: 700; }
+      .lang-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .lang-btn::after { content: ""; flex: none; border: 4px solid transparent; border-top-color: currentColor; border-bottom-width: 0; opacity: 0.7; }
+      .lang-btn:hover, .lang-btn[aria-expanded="true"] { background: var(--hover); }
+      .lang-panel { position: absolute; z-index: 2147483647; width: 240px; display: flex; flex-direction: column; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 28px rgba(0,0,0,0.3); overflow: hidden; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color-scheme: ${isDark ? "dark" : "light"}; }
+      .lang-search { margin: 8px; padding: 8px 10px; font: inherit; font-size: 14px; color: var(--text); background: var(--footer); border: 1px solid var(--border); border-radius: 8px; outline: none; }
+      .lang-search:focus { border-color: var(--accent); }
+      .lang-list { position: relative; list-style: none; margin: 0; padding: 0 0 6px; overflow-y: auto; }
+      .lang-heading { padding: 6px 14px 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.55; }
+      .lang-option { display: flex; justify-content: space-between; padding: 7px 14px; font-size: 14px; cursor: pointer; }
+      .lang-option.active { background: var(--hover); }
+      .lang-option.current { color: var(--accent); font-weight: 700; }
+      .lang-empty { padding: 12px 14px; font-size: 14px; opacity: 0.6; }
       .rev-btn { background: none; border: none; cursor: pointer; color: var(--text); opacity: 0.3; font-size: 14px; transition: 0.2s; }
       .rev-btn:hover { opacity: 1; color: var(--accent); transform: rotate(180deg); }
 
@@ -299,7 +499,8 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
       .icon-btn:hover { opacity: 1; background: var(--hover); }
       .icon-btn:active { transform: scale(0.9); }
       .icon-btn.success { fill: #10b981; opacity: 1; background: rgba(16, 185, 129, 0.1); }
-      .icon-btn.saved { fill: #f5b400; opacity: 1; }      .icon-btn svg { width: 18px; height: 18px; transition: 0.2s; }
+      .icon-btn.saved { fill: #f5b400; opacity: 1; }
+      .icon-btn svg { width: 18px; height: 18px; transition: 0.2s; }
       
       #spk { margin-right: auto; } /* Keep speaker on the left */
     `;
@@ -317,17 +518,13 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
     const iconSun = `<svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L5.99 4.58zm12.02 12.02a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42zM18.01 4.58a.996.996 0 00-1.41 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42a.996.996 0 00-1.41 0zM5.99 16.6a.996.996 0 00-1.41 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42z"/></svg>`;
     const iconMoon = `<svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>`;
 
-    const opts = Object.entries(LANGUAGES)
-      .map(([c, n]) => `<option value="${c}">${n}</option>`)
-      .join("");
-
     container.innerHTML = `
       <div class="gt-header">
         <div class="header-controls">
           <svg style="width:18px;height:18px;fill:var(--accent);margin-right:4px;" viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
-          <select id="sl">${opts}</select>
+          <div id="sl"></div>
           <button id="rev-btn" class="rev-btn">⇌</button>
-          <select id="tl">${opts}</select>
+          <div id="tl"></div>
         </div>
         <button id="theme-btn" class="icon-btn">${isDark ? iconSun : iconMoon}</button>
       </div>
@@ -340,6 +537,10 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
         <button id="cpy" class="icon-btn" title="Copy">${iconCpy}</button>
       </div>
     `;
+    // The language pickers replace these placeholders. A panel left open from before a rebuild goes too.
+    shadow.querySelectorAll(".lang-panel").forEach((p) => p.remove());
+    container.querySelector("#sl").replaceWith(createLanguagePicker(shadow, "sl", { includeAuto: true }));
+    container.querySelector("#tl").replaceWith(createLanguagePicker(shadow, "tl", { includeAuto: false }));
     setupEventListeners(iconCpy, iconCheck, iconStar, iconStarFilled);
   };
 

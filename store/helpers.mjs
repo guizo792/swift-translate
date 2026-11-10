@@ -116,7 +116,9 @@ export async function waitForTranslation(page) {
     await page.waitForTimeout(RETRY_WAIT);
     // Choosing the same target language again makes the popup look the text up again.
     const target = page.locator('#tl');
-    await target.selectOption(await target.inputValue());
+    const code = await target.getAttribute('data-value');
+    await target.click();
+    await page.locator(`.lang-panel [role=option][data-value="${code}"]`).first().click();
     lastLookup = Date.now();
     text = await readResult(page);
   }
