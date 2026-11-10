@@ -481,6 +481,15 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
 
       .gt-body { padding: 16px; font-size: 18px; line-height: 1.6; max-height: ${bodyMaxHeight}px; overflow-y: auto; min-height: 60px; }
 
+      .src-row { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; }
+      .src { flex: 1; min-width: 0; font-size: 14px; line-height: 1.45; opacity: 0.65; cursor: text; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+      .src:hover { opacity: 1; }
+      .src.editing { display: block; opacity: 1; overflow: visible; }
+      .src-edit { flex: none; width: 24px; height: 24px; padding: 0; border: none; border-radius: 6px; background: none; cursor: pointer; fill: var(--text); opacity: 0.45; display: flex; align-items: center; justify-content: center; }
+      .src-edit:hover { opacity: 1; background: var(--hover); }
+      .src-edit svg { width: 15px; height: 15px; }
+      .src-input { display: block; width: 100%; box-sizing: border-box; max-height: 110px; padding: 6px 8px; resize: none; font: inherit; font-size: 14px; line-height: 1.45; color: var(--text); background: var(--footer); border: 1px solid var(--accent); border-radius: 8px; outline: none; }
+
       .romanized, .note { font-size: 14px; opacity: 0.65; margin-top: 4px; }
       .dict-toggle { display: block; margin-top: 8px; padding: 0; border: none; background: none; cursor: pointer; color: var(--text); font: inherit; font-size: 14px; text-decoration: underline; opacity: 0.65; }
       .dict-toggle:hover { color: var(--accent); opacity: 1; }
@@ -515,6 +524,7 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
     const iconStar = `<svg viewBox="0 0 24 24"><path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/></svg>`;
     const iconStarFilled = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
     const iconBook = `<svg viewBox="0 0 24 24"><path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/></svg>`;
+    const iconPencil = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
     // New Web/Globe Icon
     const iconWeb = `<svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.987 7.987 0 0 1 5.08 16zm2.95-8H5.08a7.987 7.987 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>`;
     const iconSun = `<svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41L5.99 4.58zm12.02 12.02a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42zM18.01 4.58a.996.996 0 00-1.41 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42a.996.996 0 00-1.41 0zM5.99 16.6a.996.996 0 00-1.41 1.41l1.42 1.42c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-1.42-1.42z"/></svg>`;
@@ -530,7 +540,10 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
         </div>
         <button id="theme-btn" class="icon-btn">${isDark ? iconSun : iconMoon}</button>
       </div>
-      <div class="gt-body"><div id="res">...</div><div id="extra"></div></div>
+      <div class="gt-body">
+        <div class="src-row"><div id="src" class="src" title="Edit text"></div><button id="src-edit" class="src-edit" title="Edit text">${iconPencil}</button></div>
+        <div id="res">...</div><div id="extra"></div>
+      </div>
       <div class="gt-footer">
         <button id="spk" class="icon-btn" title="Speak">${iconVol}</button>
         <button id="star" class="icon-btn" title="Save to vocabulary">${iconStar}</button>
@@ -554,6 +567,65 @@ function showOverlay(originalText, initialSl, initialTl, coords, context = "") {
     const fetchUpdate = () => {
       requestTranslation(originalText, slEl.value, tlEl.value, container);
     };
+
+    // The original text is always shown, muted. Click it (or the pencil) to change it; Enter or clicking
+    // away translates the new text, Escape puts the old text back. It never translates while you type:
+    // Google refuses lookups that come close together.
+    const srcEl = container.querySelector("#src");
+    srcEl.textContent = originalText;
+    const pageSentence = context; // what the page said around the original selection
+    const startEdit = () => {
+      if (srcEl.querySelector("textarea")) return;
+      const area = document.createElement("textarea");
+      area.className = "src-input";
+      area.rows = 1;
+      area.value = originalText;
+      area.spellcheck = false;
+      const fit = () => {
+        area.style.height = "auto";
+        // scrollHeight leaves out the border, which would leave a sliver that scrolls
+        area.style.height = `${area.scrollHeight + area.offsetHeight - area.clientHeight}px`;
+      };
+      let done = false;
+      const finish = (commit) => {
+        if (done) return;
+        done = true;
+        const next = area.value.trim();
+        srcEl.classList.remove("editing");
+        if (commit && next && next !== originalText.trim()) {
+          originalText = next;
+          // The saved sentence only helps if it still contains the word. It is always chosen from what the
+          // page said, so editing away from the word and back brings it back.
+          context = pageSentence.toLowerCase().includes(next.toLowerCase()) ? pageSentence : "";
+          srcEl.textContent = originalText;
+          container.onresult?.(); // the star was for the old text
+          fetchUpdate();
+        } else {
+          srcEl.textContent = originalText;
+        }
+      };
+      area.addEventListener("input", fit);
+      area.addEventListener("keydown", (e) => {
+        e.stopPropagation(); // typing here must not trigger the page's own keyboard shortcuts
+        if (e.isComposing) return;
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          finish(true);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          finish(false);
+        }
+      });
+      for (const type of ["keyup", "keypress"]) area.addEventListener(type, (e) => e.stopPropagation());
+      area.addEventListener("blur", () => finish(true));
+      srcEl.classList.add("editing");
+      srcEl.replaceChildren(area);
+      fit();
+      area.focus({ preventScroll: true });
+      area.setSelectionRange(area.value.length, area.value.length);
+    };
+    srcEl.onclick = startEdit;
+    container.querySelector("#src-edit").onclick = startEdit;
 
     container.querySelector("#rev-btn").onclick = () => {
       const oldSl = slEl.value;
