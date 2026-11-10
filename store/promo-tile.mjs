@@ -11,8 +11,9 @@ const SHOT = path.resolve(import.meta.dirname, 'screenshots', '02-dictionary.png
 const OUT = path.resolve(import.meta.dirname, 'promo-440x280.png');
 if (!fs.existsSync(SHOT)) throw new Error('screenshots/02-dictionary.png is missing: run screenshots.mjs first');
 
-// The popup inside the 1280x800 dictionary screenshot (just inside its rounded border).
-const POPUP = { x: 279, y: 219, width: 722, height: 522 };
+// Where the popup is in the dictionary screenshot, written by screenshots.mjs; cut a little inside its border.
+const RECT = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '.popup-rect.json'), 'utf8'));
+const POPUP = { x: Math.round(RECT.x) + 2, y: Math.round(RECT.y) + 2, width: Math.round(RECT.width) - 4, height: Math.round(RECT.height) - 4 };
 const source = PNG.sync.read(fs.readFileSync(SHOT));
 const popup = new PNG({ width: POPUP.width, height: POPUP.height });
 PNG.bitblt(source, popup, POPUP.x, POPUP.y, POPUP.width, POPUP.height, 0, 0);

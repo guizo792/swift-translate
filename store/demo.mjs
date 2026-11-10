@@ -62,7 +62,7 @@ const centreOf = async (selector) => {
 };
 
 try {
-  await configure(worker, { targetLang: 'fr', sourceLang: 'auto', theme: 'light' });
+  await configure(worker, { targetLang: 'de', sourceLang: 'auto', theme: 'light' });
   await openArticle(page, EN_ARTICLE);
   // Text only: pictures and tables would use up the GIF's colours and size.
   // (Set on each element: the skin's own !important rules beat a style sheet.)
@@ -98,13 +98,12 @@ try {
   await page.waitForTimeout(300);
   await snap(1400);
 
-  // 2: close it, then a whole sentence into Arabic
+  // 2: close it, then a whole sentence
   // the empty margin beside the article: a click inside the text could land on a link
   await glide({ x: 30, y: 300 }, { steps: 8 });
   await page.mouse.down();
   await page.mouse.up();
   await snap(500);
-  await configure(worker, { targetLang: 'ar' });
   const sentence = 'The capacity to successfully use language requires human beings to acquire a range of tools, including phonology, morphology, syntax, semantics, and an extensive vocabulary.';
   const { first, last } = await locate(page, sentence, sentence, { top: 120 });
   await glide({ x: first.x + 1, y: first.y + first.h / 2 }, { steps: 10 });
@@ -128,7 +127,32 @@ try {
   await page.mouse.up();
   await snap(450);
   await waitForTranslation(page);
-  await snap(2800);
+  await snap(2200); // the German translation of the sentence
+  // swap: the German text becomes the original text, and the result is the way back
+  await glide(await centreOf('#rev-btn'), { steps: 9 });
+  await pace(page);
+  await page.mouse.down();
+  await page.mouse.up();
+  await snap(450);
+  await waitForTranslation(page);
+  await snap(2400);
+  // edit the original text: a single German word this time
+  await glide(await centreOf('#src-edit'), { steps: 8 });
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  await snap(500);
+  await page.keyboard.press('Control+A');
+  for (const letter of 'Brücke') {
+    await page.keyboard.type(letter);
+    await snap(150);
+  }
+  await snap(600);
+  await pace(page);
+  await page.keyboard.press('Enter');
+  await snap(450);
+  await waitForTranslation(page);
+  await snap(2400);
 
   // 3: dark mode
   await glide(await centreOf('#theme-btn'), { steps: 10 });

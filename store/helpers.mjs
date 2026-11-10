@@ -1,6 +1,6 @@
 // Drives the real extension on real pages: select text with the mouse, click the icon, read the popup.
 export const EN_ARTICLE = 'https://en.wikipedia.org/wiki/Language_acquisition?useskin=minerva';
-export const FR_ARTICLE = 'https://fr.wikipedia.org/wiki/Acquisition_du_langage?useskin=minerva';
+export const DE_ARTICLE = 'https://de.wikipedia.org/wiki/Spracherwerb?useskin=minerva';
 
 /** Opens an article in Wikipedia's plain reading skin, with the site chrome hidden. */
 export async function openArticle(page, url) {

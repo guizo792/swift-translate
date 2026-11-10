@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { launch, configure } from './launch.mjs';
 import { frame, size } from './frame.mjs';
-import { EN_ARTICLE, FR_ARTICLE, openArticle, openPopup, popupBox, selectText, selectWord } from './helpers.mjs';
+import { DE_ARTICLE, EN_ARTICLE, openArticle, openPopup, popupBox, selectText, selectWord } from './helpers.mjs';
 
 const OUT = path.resolve(import.meta.dirname, 'screenshots');
 const RAW = path.resolve(import.meta.dirname, '.frames');
@@ -70,8 +70,8 @@ const saveWithStar = async () => {
 };
 
 try {
-  // 1 and 2: English article, translated to French. The first word is saved, so the star is gold.
-  await configure(worker, { targetLang: 'fr', sourceLang: 'auto', theme: 'light' });
+  // 1 and 2: English article, translated to German. The first word is saved, so the star is gold.
+  await configure(worker, { targetLang: 'de', sourceLang: 'auto', theme: 'light' });
   await openArticle(page, EN_ARTICLE);
   const word = await selectWord(page, 'perceive and comprehend language', 'comprehend');
   const icon = page.locator('button[title="Translate"]');
@@ -87,7 +87,15 @@ try {
   await saveWithStar();
   await page.locator('.dict-toggle').click(); // the dictionary is hidden until asked for
   await page.waitForTimeout(300);
-  await make('02-dictionary.png', 'Meanings, examples and similar words', cropAround([toBox(word), await popupBox(page)], { pad: 36 }));
+  const popup02 = await popupBox(page);
+  const clip02 = cropAround([toBox(word), popup02], { pad: 36 });
+  await make('02-dictionary.png', 'Meanings, examples and similar words', clip02);
+  // Where the popup is in that picture: the promo tile cuts it out (see promo-tile.mjs).
+  const scale02 = 1280 / clip02.width;
+  fs.writeFileSync(
+    path.resolve(import.meta.dirname, '.popup-rect.json'),
+    JSON.stringify({ x: (popup02.x - clip02.x) * scale02, y: 100 + (popup02.y - clip02.y) * scale02, width: popup02.width * scale02, height: popup02.height * scale02 }),
+  );
 
   // Two more words for the saved-words page.
   for (const [context, target] of [
@@ -101,8 +109,7 @@ try {
     await saveWithStar();
   }
 
-  // 3: a whole sentence into Arabic, with the romanization under it.
-  await configure(worker, { targetLang: 'ar' });
+  // 3: a whole sentence into German.
   await openArticle(page, EN_ARTICLE);
   const sentence =
     'The capacity to successfully use language requires human beings to acquire a range of tools, including phonology, morphology, syntax, semantics, and an extensive vocabulary.';
@@ -119,13 +126,18 @@ try {
   await openPopup(page);
   await saveWithStar();
 
-  // 4: a French article into English, in dark mode.
+  // 4: a German article into English, in dark mode, with the language picker being searched.
   await configure(worker, { targetLang: 'en', theme: 'dark' });
-  await openArticle(page, FR_ARTICLE);
-  const french = await selectWord(page, 'à décrire et comprendre', 'décrire');
+  await openArticle(page, DE_ARTICLE);
+  const german = await selectWord(page, 'in der Regel die Aneignung einer', 'Aneignung');
   await openPopup(page);
   await saveWithStar();
-  await make('04-dark.png', 'Any language, light or dark', cropAround([toBox(french), await popupBox(page)], { pad: 40 }));
+  await page.locator('#tl .lang-btn').click();
+  await page.keyboard.type('ge');
+  await page.waitForTimeout(300);
+  const panel = await page.locator('.lang-panel').boundingBox();
+  await make('04-languages.png', 'Search any of 80+ languages', cropAround([toBox(german), await popupBox(page), panel], { pad: 30 }));
+  await page.keyboard.press('Escape');
 
   // 5: the saved words, with the sentences they came from.
   await configure(worker, { theme: 'light' });

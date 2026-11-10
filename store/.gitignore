@@ -1,3 +1,4 @@
 node_modules/
 .profile/
 .frames/
+.popup-rect.json
