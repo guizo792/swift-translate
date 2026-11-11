@@ -30,9 +30,6 @@ let blockedUntil = 0;
 
 const openVocab = () => chrome.tabs.create({ url: chrome.runtime.getURL("vocab.html") });
 
-// The toolbar button opens the saved-words page
-chrome.action.onClicked.addListener(openVocab);
-
 // Listen for translation requests from the UI
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // A content script can't open an extension page itself

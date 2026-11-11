@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Swift Translate</title>
+  <style>
+    :root { --bg: #ffffff; --text: #202124; --muted: #5f6368; --line: #dadce0; --accent: #1a73e8; --hover: #f1f3f4; }
+    :root[data-theme="dark"] { --bg: #202124; --text: #e8eaed; --muted: #9aa0a6; --line: #3c4043; --accent: #8ab4f8; --hover: #2d2e31; }
+    body { width: 280px; margin: 0; padding: 14px; background: var(--bg); color: var(--text); font: 14px "Segoe UI", Arial, sans-serif; }
+    h1 { font-size: 15px; margin: 0 0 12px; }
+    label.field { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    input[type=text] { box-sizing: border-box; width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+    input[type=text]:focus { outline: none; border-color: var(--accent); }
+    ul { list-style: none; margin: 6px 0 0; padding: 4px; max-height: 170px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; }
+    li { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+    li.active { background: var(--hover); color: var(--accent); }
+    li.empty { color: var(--muted); cursor: default; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0; cursor: pointer; }
+    .row small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+    a { display: block; padding: 9px 10px; margin: 0 -10px; border-radius: 6px; color: var(--accent); text-decoration: none; border-top: 1px solid var(--line); border-radius: 0; }
+    a:hover { background: var(--hover); }
+  </style>
+</head>
+<body>
+  <h1>Swift Translate</h1>
+  <label class="field" for="lang">Translate into</label>
+  <input id="lang" type="text" autocomplete="off" spellcheck="false" placeholder="Search languages">
+  <ul id="list" hidden></ul>
+  <label class="row" for="icon">
+    <span>Show icon when selecting text<small>Off: right-click the selection and choose Translate Selection</small></span>
+    <input type="checkbox" id="icon">
+  </label>
+  <a href="vocab.html" target="_blank">Open saved words</a>
+  <script src="languages.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
