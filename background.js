@@ -28,15 +28,8 @@ const toBase64 = (buffer) => {
 const COOLDOWN_MS = 30_000;
 let blockedUntil = 0;
 
-const openVocab = () => chrome.tabs.create({ url: chrome.runtime.getURL("vocab.html") });
-
 // Listen for translation requests from the UI
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // A content script can't open an extension page itself
-  if (request.action === "openVocab") {
-    openVocab();
-    return;
-  }
   // Google's own spoken audio, which sounds the same as in Google Translate and covers
   // languages like Arabic that many computers have no installed voice for
   if (request.action === "fetchSpeech") {
