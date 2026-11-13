@@ -79,4 +79,9 @@ chrome.storage.sync.get(
 
 icon.onchange = () => chrome.storage.sync.set({ showIcon: icon.checked });
 // Links in a popup open in a new tab, then the popup should close
-document.querySelector("a").addEventListener("click", () => setTimeout(close, 50));
+document.getElementById("vocab").addEventListener("click", () => setTimeout(close, 50));
+
+// How many words are saved
+chrome.storage.local.get({ vocab: [] }, ({ vocab }) => {
+  document.getElementById("count").textContent = vocab.length ? String(vocab.length) : "";
+});
