@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Swift Translate",
-  "version": "1.3.0",
+  "version": "1.3.2",
   "description": "Select text on any page to translate it instantly, with meanings, examples, voice, 80+ languages and a saved-words list.",
   "permissions": [
     "contextMenus",
