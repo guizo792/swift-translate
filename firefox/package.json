@@ -1,0 +1,8 @@
+{
+  "name": "swift-translate-firefox",
+  "private": true,
+  "type": "module",
+  "description": "Packages the extension for Firefox: node build.mjs",
+  "scripts": { "build": "node build.mjs", "lint": "web-ext lint -s build", "package": "web-ext build -s build -a ../dist --overwrite-dest" },
+  "devDependencies": { "web-ext": "^8.0.0" }
+}
